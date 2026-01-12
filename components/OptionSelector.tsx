@@ -1,6 +1,6 @@
 import React from 'react';
 import { SCHOOL_LEVELS, GOWN_COLORS, BACKGROUNDS, CONFETTI_OPTIONS } from '../constants';
-import { GraduationOptions, SchoolLevel, GownColor, BackgroundStyle, ConfettiType } from '../types';
+import { GraduationOptions } from '../types';
 
 interface OptionSelectorProps {
   options: GraduationOptions;
