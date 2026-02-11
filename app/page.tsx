@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { GraduationOptions, SchoolLevel, GownColor, BackgroundStyle, ConfettiType } from '@/types';
 import PhotoUploader from '@/components/PhotoUploader';
 import OptionSelector from '@/components/OptionSelector';
@@ -10,6 +10,12 @@ import LoadingScreen from '@/components/LoadingScreen';
 import { compressImage } from '@/utils/image';
 
 export default function Home() {
+    // Authentication State
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [passwordInput, setPasswordInput] = useState('');
+    const [authError, setAuthError] = useState('');
+    const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
     // Application State
     const [originalImage, setOriginalImage] = useState<string | null>(null);
     const [resultImage, setResultImage] = useState<string | null>(null);
@@ -26,6 +32,41 @@ export default function Home() {
     };
 
     const [options, setOptions] = useState<GraduationOptions>(defaultOptions);
+
+    useEffect(() => {
+        const savedAuth = sessionStorage.getItem('is_authenticated');
+        if (savedAuth === 'true') {
+            setIsAuthenticated(true);
+        }
+        setIsCheckingAuth(false);
+    }, []);
+
+    const handlePasswordSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setAuthError('');
+        setIsLoading(true);
+
+        try {
+            const res = await fetch('/api/verify-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: passwordInput }),
+            });
+
+            const data = await res.json();
+
+            if (data.success) {
+                setIsAuthenticated(true);
+                sessionStorage.setItem('is_authenticated', 'true');
+            } else {
+                setAuthError('비밀번호가 올바르지 않습니다.');
+            }
+        } catch (err) {
+            setAuthError('오류가 발생했습니다. 다시 시도해주세요.');
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const handleImageSelected = useCallback((base64: string) => {
         setOriginalImage(base64);
@@ -86,6 +127,41 @@ export default function Home() {
         setOptions(defaultOptions);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
+
+    if (isCheckingAuth) {
+        return <LoadingScreen />;
+    }
+
+    if (!isAuthenticated) {
+        return (
+            <div className="min-h-screen bg-[#Fdfcf8] text-slate-800 flex items-center justify-center p-4">
+                <div className="bg-white rounded-3xl p-8 shadow-xl border border-purple-100 max-w-md w-full text-center">
+                    <div className="text-4xl mb-4">🔒</div>
+                    <h1 className="text-2xl font-bold text-gray-800 mb-2">접속 권한 확인</h1>
+                    <p className="text-gray-500 mb-8">서비스 이용을 위해 비밀번호를 입력해주세요.</p>
+
+                    <form onSubmit={handlePasswordSubmit} className="space-y-4">
+                        <input
+                            type="password"
+                            value={passwordInput}
+                            onChange={(e) => setPasswordInput(e.target.value)}
+                            placeholder="비밀번호 입력"
+                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none transition-all"
+                            autoFocus
+                        />
+                        {authError && <p className="text-red-500 text-sm font-medium">{authError}</p>}
+                        <button
+                            type="submit"
+                            disabled={isLoading}
+                            className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-slate-800 active:scale-95 transition-all disabled:opacity-50"
+                        >
+                            {isLoading ? '확인 중...' : '입력 완료'}
+                        </button>
+                    </form>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-[#Fdfcf8] text-slate-800 pb-20">
