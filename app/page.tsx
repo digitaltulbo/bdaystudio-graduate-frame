@@ -7,6 +7,8 @@ import OptionSelector from '@/components/OptionSelector';
 import ResultDisplay from '@/components/ResultDisplay';
 import LoadingScreen from '@/components/LoadingScreen';
 
+import { compressImage } from '@/utils/image';
+
 export default function Home() {
     // Application State
     const [originalImage, setOriginalImage] = useState<string | null>(null);
@@ -38,13 +40,18 @@ export default function Home() {
         setError(null);
 
         try {
+            // Compress image for API to avoid payload limit (413)
+            // Preview remains high quality (originalImage)
+            const compressedBase64 = await compressImage(originalImage, 1024, 0.8);
+
             const minLoadTime = new Promise(resolve => setTimeout(resolve, 2000));
 
             // Call server-side API route instead of client-side Gemini SDK
             const generatePromise = fetch('/api/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ imageBase64: originalImage, options }),
+                // Send compressed image to API
+                body: JSON.stringify({ imageBase64: compressedBase64, options }),
             }).then(async (res) => {
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || '이미지 생성 중 오류가 발생했습니다.');

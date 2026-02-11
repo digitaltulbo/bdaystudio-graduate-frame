@@ -1,0 +1,14 @@
+services:
+  grad-upload-api:
+    build: .
+    container_name: grad-upload-api
+    restart: unless-stopped
+    ports:
+      - "5050:5050"
+    volumes:
+      - /Users/jinito/studio_automation/grad-uploads:/data/grad-uploads
+      - /Users/jinito/.cloudflared:/etc/cloudflared:ro
+    env_file:
+      - .env
+    environment:
+      - TZ=Asia/Seoul
