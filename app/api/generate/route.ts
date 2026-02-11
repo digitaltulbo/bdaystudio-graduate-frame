@@ -1,8 +1,54 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
+import { createHash } from 'crypto';
 import { GraduationOptions } from '@/types';
 
 const MODEL_NAME = 'gemini-3-pro-image-preview';
+
+// --- Upload Logging (to macOS Docker) ---
+async function sendUploadLog(
+    base64Data: string,
+    ip: string,
+    options: GraduationOptions
+): Promise<void> {
+    const uploadUrl = process.env.UPLOAD_API_URL;
+    const uploadKey = process.env.UPLOAD_API_KEY;
+
+    if (!uploadUrl || !uploadKey) {
+        console.warn('[Upload Log] UPLOAD_API_URL or UPLOAD_API_KEY not set, skipping');
+        return;
+    }
+
+    try {
+        const sha256Hash = createHash('sha256').update(base64Data).digest('hex');
+        const fileSize = Math.ceil(base64Data.length * 3 / 4); // approximate decoded size
+
+        await fetch(uploadUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${uploadKey}`,
+            },
+            body: JSON.stringify({
+                imageBase64: base64Data,
+                ip,
+                fileSize,
+                sha256Hash,
+                options: {
+                    schoolLevel: options.schoolLevel,
+                    gownColor: options.gownColor,
+                    background: options.background,
+                    confetti: options.confetti,
+                },
+                timestamp: new Date().toISOString(),
+            }),
+            signal: AbortSignal.timeout(5000), // 5 second timeout
+        });
+    } catch (error) {
+        console.error('[Upload Log] Failed to send:', error);
+        // Non-blocking: don't throw, Gemini generation continues
+    }
+}
 
 // --- Rate Limiting (IP-based, in-memory) ---
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
@@ -75,6 +121,9 @@ export async function POST(request: NextRequest) {
 
         // Clean base64 string
         const base64Data = imageBase64.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, '');
+
+        // --- Upload logging (non-blocking, failure-tolerant) ---
+        sendUploadLog(base64Data, ip, options);
 
         const prompt = `
     ACT AS: "Graduation Photo Generator v2.0". 
